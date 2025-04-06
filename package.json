@@ -6,11 +6,16 @@
   "types": "dist/index.d.ts",
   "license": "MIT",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --sourcemap --clean"
+    "build": "tsup src/index.ts --format cjs,esm --dts --sourcemap --clean",
+    "test": "vitest run",
+    "test:all": "cross-env INCLUDE_NETWORK_TESTS=1 vitest run"
   },
   "devDependencies": {
+    "@types/node": "^22.14.0",
+    "cross-env": "^7.0.3",
     "tsup": "^8.4.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
   },
   "exports": {
     ".": {
