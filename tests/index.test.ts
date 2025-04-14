@@ -3,9 +3,18 @@ import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import {
   clearFetchMocks,
   mockFetchResponse,
+  mockFetchErrorResponse,
+  mockFetchNetworkError,
+  mockFetchTimeout,
   restoreRealFetch,
   setupMockFetch,
 } from "./utils/fetch-mocks";
+import {
+  InvalidTrackIdError,
+  InvalidSpotifyUrlError,
+  NoPreviewAvailableError,
+  SpotifyApiError,
+} from "../src";
 
 // Set up the mock fetch
 setupMockFetch();
@@ -55,12 +64,18 @@ describe("getPreview", () => {
       expect(result).toBeNull();
     });
 
-    test("should throw error when throws option is true and no preview URL is found", async () => {
+    test("should throw NoPreviewAvailableError when throws option is true and no preview URL is found", async () => {
       mockFetchResponse('{"someOtherData": "value"}');
 
-      await expect(
-        getPreview("1234567890123456789012", { throws: true })
-      ).rejects.toThrow("No preview found for this track");
+      const error = await getPreview("1234567890123456789012", {
+        throws: true,
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(NoPreviewAvailableError);
+      expect(error.message).toContain(
+        "No audio preview available for track ID"
+      );
+      expect(error.trackId).toBe("1234567890123456789012");
     });
 
     test("should extract track ID from Spotify URL", async () => {
@@ -79,16 +94,71 @@ describe("getPreview", () => {
       expect(result).toBe(mockPreviewUrl);
     });
 
-    test("should throw an error for invalid track ID", async () => {
-      await expect(getPreview("invalid-id")).rejects.toThrow(
-        "Invalid track ID or URL"
-      );
-    });
+    describe("Error Handling", () => {
+      test("should throw InvalidTrackIdError for invalid track ID", async () => {
+        const error = await getPreview("invalid-id").catch((e) => e);
 
-    test("should throw an error for invalid Spotify URL", async () => {
-      await expect(
-        getPreview("https://open.spotify.com/album/7tgTOUXm74GKA12wsQIUPu")
-      ).rejects.toThrow("Invalid track ID or URL");
+        expect(error).toBeInstanceOf(InvalidTrackIdError);
+        expect(error.message).toContain("Invalid track ID format");
+        expect(error.name).toBe("InvalidTrackIdError");
+      });
+
+      test("should throw InvalidSpotifyUrlError for invalid Spotify URL", async () => {
+        const error = await getPreview(
+          "https://open.spotify.com/album/7tgTOUXm74GKA12wsQIUPu"
+        ).catch((e) => e);
+
+        expect(error).toBeInstanceOf(InvalidSpotifyUrlError);
+        expect(error.message).toContain("Invalid Spotify URL");
+        expect(error.name).toBe("InvalidSpotifyUrlError");
+      });
+
+      test("should throw SpotifyApiError when fetch fails with network error", async () => {
+        mockFetchNetworkError("Network failure");
+
+        const error = await getPreview("1234567890123456789012").catch(
+          (e) => e
+        );
+
+        expect(error).toBeInstanceOf(SpotifyApiError);
+        expect(error.message).toContain("Failed to retrieve preview");
+        expect(error.statusCode).toBeUndefined();
+      });
+
+      test("should throw SpotifyApiError when fetch times out", async () => {
+        mockFetchTimeout();
+
+        const error = await getPreview("1234567890123456789012").catch(
+          (e) => e
+        );
+
+        expect(error).toBeInstanceOf(SpotifyApiError);
+        expect(error.message).toContain("Failed to retrieve preview");
+      });
+
+      test("should throw SpotifyApiError for 500 response", async () => {
+        mockFetchErrorResponse(500, "Server Error");
+
+        const error = await getPreview("1234567890123456789012").catch(
+          (e) => e
+        );
+
+        expect(error).toBeInstanceOf(SpotifyApiError);
+        expect(error.message).toContain("Failed to fetch track preview data");
+        expect(error.statusCode).toBe(500);
+      });
+
+      test("should throw SpotifyApiError for 429 rate limit response", async () => {
+        mockFetchErrorResponse(429, "Too Many Requests");
+
+        const error = await getPreview("1234567890123456789012").catch(
+          (e) => e
+        );
+
+        expect(error).toBeInstanceOf(SpotifyApiError);
+        expect(error.message).toContain("Failed to fetch track preview data");
+        expect(error.statusCode).toBe(429);
+      });
     });
   });
 
@@ -132,11 +202,17 @@ describe("getPreview", () => {
         expect(result).toBeNull();
       }, 10000);
 
-      test("should throw when throws option is true and track doesn't exist", async () => {
+      test("should throw NoPreviewAvailableError when throws option is true and track doesn't exist", async () => {
         // This is a well-formatted but non-existent track ID
-        await expect(
-          getPreview("1234567890123456789012", { throws: true })
-        ).rejects.toThrow("No preview found for this track");
+        const error = await getPreview("1234567890123456789012", {
+          throws: true,
+        }).catch((e) => e);
+
+        expect(error).toBeInstanceOf(NoPreviewAvailableError);
+        expect(error.message).toContain(
+          "No audio preview available for track ID"
+        );
+        expect(error.trackId).toBe("1234567890123456789012");
       }, 10000);
     }
   );

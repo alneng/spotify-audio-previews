@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractTrackIdFromUrl, validateSpotifyTrackId } from "../src";
+import { InvalidSpotifyUrlError, InvalidTrackIdError } from "../src";
 
 describe("extractTrackIdFromUrl", () => {
   it("should extract track ID from a standard Spotify track URL", () => {
@@ -13,19 +14,20 @@ describe("extractTrackIdFromUrl", () => {
     expect(extractTrackIdFromUrl(url)).toBe("3zhbXKFjUDw40pTYyCgt1Y");
   });
 
-  it("should return null for a Spotify URL without a track path", () => {
+  it("should throw InvalidSpotifyUrlError for a Spotify URL without a track path", () => {
     const url = "https://open.spotify.com/album/7tgTOUXm74GKA12wsQIUPu";
-    expect(extractTrackIdFromUrl(url)).toBeNull();
+    expect(() => extractTrackIdFromUrl(url)).toThrow(InvalidSpotifyUrlError);
+    expect(() => extractTrackIdFromUrl(url)).toThrow("Invalid Spotify URL");
   });
 
-  it("should return null for a non-Spotify URL", () => {
+  it("should throw InvalidSpotifyUrlError for a non-Spotify URL", () => {
     const url = "https://www.google.com";
-    expect(extractTrackIdFromUrl(url)).toBeNull();
+    expect(() => extractTrackIdFromUrl(url)).toThrow(InvalidSpotifyUrlError);
   });
 
-  it("should return null for a completely invalid URL", () => {
+  it("should throw InvalidSpotifyUrlError for a completely invalid URL", () => {
     const url = "not-a-valid-url";
-    expect(extractTrackIdFromUrl(url)).toBeNull();
+    expect(() => extractTrackIdFromUrl(url)).toThrow(InvalidSpotifyUrlError);
   });
 });
 
@@ -35,18 +37,21 @@ describe("validateSpotifyTrackId", () => {
     expect(validateSpotifyTrackId(trackId)).toBe(true);
   });
 
-  it("should return false for a track ID that is too short", () => {
+  it("should throw InvalidTrackIdError for a track ID that is too short", () => {
     const trackId = "3zhbXKFjUDw40pTYyCgt1";
-    expect(validateSpotifyTrackId(trackId)).toBe(false);
+    expect(() => validateSpotifyTrackId(trackId)).toThrow(InvalidTrackIdError);
+    expect(() => validateSpotifyTrackId(trackId)).toThrow(
+      "Invalid track ID format"
+    );
   });
 
-  it("should return false for a track ID that is too long", () => {
+  it("should throw InvalidTrackIdError for a track ID that is too long", () => {
     const trackId = "3zhbXKFjUDw40pTYyCgt1Ya";
-    expect(validateSpotifyTrackId(trackId)).toBe(false);
+    expect(() => validateSpotifyTrackId(trackId)).toThrow(InvalidTrackIdError);
   });
 
-  it("should return false for a track ID with invalid characters", () => {
+  it("should throw InvalidTrackIdError for a track ID with invalid characters", () => {
     const trackId = "3zhbXKFjUDw-0pTYyCgt1Y";
-    expect(validateSpotifyTrackId(trackId)).toBe(false);
+    expect(() => validateSpotifyTrackId(trackId)).toThrow(InvalidTrackIdError);
   });
 });
