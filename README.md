@@ -22,6 +22,7 @@ pnpm add spotify-audio-previews
 - No API key or authentication required
 - Written in TypeScript with full type definitions
 - Zero dependencies
+- Comprehensive debug/logging system
 
 ## Usage
 
@@ -78,6 +79,91 @@ try {
 }
 ```
 
+### Debug Mode
+
+The library includes a comprehensive debug system to help troubleshoot issues:
+
+```typescript
+import { getPreview, LogLevel } from "spotify-audio-previews";
+
+// Enable debug logging for a specific operation
+const previewUrl = await getPreview("3zhbXKFjUDw40pTYyCgt1Y", {
+  logger: {
+    level: LogLevel.DEBUG, // Show all debug information
+    timestamps: true, // Include timestamps in logs
+  },
+});
+
+// Console output will include detailed debug information:
+// [2025-04-14T12:34:56.789Z] [spotify-audio-previews DEBUG] Treating input as a track ID
+// [2025-04-14T12:34:56.790Z] [spotify-audio-previews DEBUG] Validating track ID: 3zhbXKFjUDw40pTYyCgt1Y
+// ...etc
+```
+
+### Global Logging Configuration
+
+You can configure logging globally for all operations using the `configure` function:
+
+```typescript
+import { configure, getPreview, LogLevel } from "spotify-audio-previews";
+
+// Configure global settings including the logger
+configure({
+  logger: {
+    level: LogLevel.INFO, // Show info, warnings and errors
+    timestamps: true,
+  },
+});
+
+// All subsequent operations will use this logging configuration
+const url1 = await getPreview("3zhbXKFjUDw40pTYyCgt1Y");
+const url2 = await getPreview(
+  "https://open.spotify.com/track/3zhbXKFjUDw40pTYyCgt1Y"
+);
+```
+
+### Custom Logger Integration
+
+You can integrate with your application's logging system:
+
+```typescript
+import { configure, LogLevel } from "spotify-audio-previews";
+import winston from "winston"; // Example using Winston logger
+
+// Configure a custom logger globally
+configure({
+  logger: {
+    level: LogLevel.DEBUG,
+    custom: (level, message, data) => {
+      switch (level) {
+        case "ERROR":
+          winston.error(`[Spotify] ${message}`, data);
+          break;
+        case "WARN":
+          winston.warn(`[Spotify] ${message}`, data);
+          break;
+        case "INFO":
+          winston.info(`[Spotify] ${message}`, data);
+          break;
+        case "DEBUG":
+          winston.debug(`[Spotify] ${message}`, data);
+          break;
+      }
+    },
+  },
+});
+
+// Or configure a custom logger for a specific operation
+const previewUrl = await getPreview("3zhbXKFjUDw40pTYyCgt1Y", {
+  logger: {
+    level: LogLevel.DEBUG,
+    custom: (level, message, data) => {
+      // Your custom logging implementation
+    },
+  },
+});
+```
+
 ### Utility Functions
 
 The package also exports utility functions for working with Spotify track IDs:
@@ -118,6 +204,10 @@ Fetches the audio preview URL for a Spotify track.
 - `track` (string): A Spotify track ID or URL
 - `options` (object, optional): Configuration options
   - `throws` (boolean): Whether to throw an error if no preview is found (default: `false`)
+  - `logger` (object, optional): Debug logging configuration
+    - `level` (LogLevel): Logging level (default: `LogLevel.NONE`)
+    - `timestamps` (boolean): Whether to include timestamps in logs (default: `true`)
+    - `custom` (function): Custom logger function (default: `undefined`)
 
 #### Returns
 
@@ -130,13 +220,26 @@ Fetches the audio preview URL for a Spotify track.
 - `NoPreviewAvailableError`: If no preview is available and `throws` is `true`
 - `SpotifyApiError`: If there's an issue with the Spotify API request
 
-### `extractTrackIdFromUrl(url)`
+### `configure(config)`
+
+Configures global settings for the package.
+
+#### Parameters
+
+- `config` (object): Global configuration options
+  - `logger` (object, optional): Logger configuration
+    - `level` (LogLevel): Logging level
+    - `timestamps` (boolean): Whether to include timestamps in logs
+    - `custom` (function): Custom logger function
+
+### `extractTrackIdFromUrl(url, log?)`
 
 Extracts the track ID from a Spotify track URL.
 
 #### Parameters
 
 - `url` (string): The Spotify track URL
+- `log` (Logger, optional): Logger instance to use for this operation (defaults to global logger)
 
 #### Returns
 
@@ -146,13 +249,36 @@ Extracts the track ID from a Spotify track URL.
 
 - `InvalidSpotifyUrlError`: If the URL doesn't contain a valid track ID
 
-### `validateSpotifyTrackId(trackId)`
+#### Example with logger
+
+```typescript
+import {
+  withLogger,
+  LogLevel,
+  extractTrackIdFromUrl,
+} from "spotify-audio-previews";
+
+// Use withLogger to create a temporary logger for specific operations
+const id = await withLogger(
+  async (log) =>
+    extractTrackIdFromUrl(
+      "https://open.spotify.com/track/3zhbXKFjUDw40pTYyCgt1Y",
+      log
+    ),
+  {
+    level: LogLevel.DEBUG,
+  }
+); // 3zhbXKFjUDw40pTYyCgt1Y
+```
+
+### `validateSpotifyTrackId(trackId, log?)`
 
 Validates a Spotify track ID.
 
 #### Parameters
 
 - `trackId` (string): The Spotify track ID to validate
+- `log` (Logger, optional): Logger instance to use for this operation (defaults to global logger)
 
 #### Returns
 
@@ -161,6 +287,34 @@ Validates a Spotify track ID.
 #### Throws
 
 - `InvalidTrackIdError`: If the track ID format is invalid
+
+### `withLogger(fn, options?)`
+
+Creates a temporary logger for a specific operation without affecting the global logger.
+
+#### Parameters
+
+- `fn` (function): Function to execute with the temporary logger
+  - The function receives a logger instance as its first parameter
+  - The function should return a Promise
+- `options` (LoggerOptions, optional): Logger configuration options
+  - `level` (LogLevel): Logging level
+  - `timestamps` (boolean): Whether to include timestamps in logs
+  - `custom` (function): Custom logger function
+
+#### Returns
+
+- A promise that resolves to the result of the function
+
+### `LogLevel`
+
+Enum representing available log levels:
+
+- `LogLevel.NONE` (0): No debugging output
+- `LogLevel.ERROR` (1): Only errors
+- `LogLevel.WARN` (2): Errors and warnings
+- `LogLevel.INFO` (3): Errors, warnings, and basic info
+- `LogLevel.DEBUG` (4): All debug information including detailed request/response data
 
 ## Error Types
 
